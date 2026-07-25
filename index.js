@@ -42,7 +42,7 @@ function attachCaptchaSolver(client, profileName, state) {
     console.log(c.yellow(`[${profileName}] Captcha detected — solving...`));
 
     const discordHeaders = {
-      Authorization: token,
+      Authorization: client.token,  // ← FIX: dùng client.token thay vì token từ event
       "Content-Type": "application/json",
       "User-Agent": "Mozilla/5.0",
     };
