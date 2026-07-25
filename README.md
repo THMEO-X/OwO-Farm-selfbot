@@ -47,9 +47,10 @@ pkg update
    npm install express
    npm install node-cron
   npm install web-push
-  npm install axios-cookiejar-support tough-cookie```
+  npm install axios-cookiejar-support tough-cookie
+```
     
- 7. You just need to wait for the entire package to finish running. After the port link appears, click on it to register an account and fill in your personal information. After that, Select "View your information" > "Edit" and then click "Save".
+> 7. You just need to wait for the entire package to finish running. After the port link appears, click on it to register an account and fill in your personal information. After that, Select "View your information" > "Edit" and then click "Save".
 > 8. After running setup.js the first time, you only need to run `node index.js`.
 
 
