@@ -6,6 +6,50 @@
   <title>HT</title>
   <link rel="stylesheet" href="index.css" />
   <style>
+    /* ── GYRO LAYER ── */
+    body { perspective: 1200px; overflow-x: hidden; }
+    #gyroWrap {
+      transform-style: preserve-3d;
+      transition: transform 0.1s ease-out;
+      min-height: 100vh;
+    }
+
+    /* ── OVERLAY + MODAL ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #00000099;
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .overlay.active { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 18px;
+      padding: 36px;
+      width: 100%;
+      max-width: 430px;
+      position: relative;
+      flex-shrink: 0;
+      flex-direction: column;
+      margin: auto;
+      animation: pop 0.22s cubic-bezier(.34,1.56,.64,1);
+      box-shadow: 0 24px 64px #00000088, 0 0 0 1px #22d3ee14;
+    }
+
+    @keyframes pop {
+      from { transform: scale(0.92) translateY(8px); opacity: 0; }
+      to   { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
     .notify-bar {
       display: none;
       align-items: center;
@@ -30,9 +74,32 @@
     .btn-notify:hover { opacity: .85; }
     .btn-notify:disabled { opacity: .5; cursor: default; }
     .notify-status { font-size: 0.8rem; color: #a78bfa; }
+
+    /* ── GYRO BUTTON ── */
+    #gyroBtn {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      z-index: 999;
+      background: var(--surface2, #131b2a);
+      border: 1px solid var(--border2, #243349);
+      color: var(--muted, #6b82a0);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: none;
+    }
+    #gyroBtn.visible { display: block; }
+    #gyroBtn:hover { border-color: #22d3ee; color: #22d3ee; }
+    #gyroBtn.active-gyro { border-color: #22d3ee; color: #22d3ee; background: #22d3ee22; }
   </style>
 </head>
 <body>
+<div id="gyroWrap">
 
 <!-- NAV -->
 <nav>
@@ -57,7 +124,6 @@
   <h2>Xin chào, <span id="welcomeName"></span> 👋</h2>
   <p class="dashboard-sub">Điền thông tin token của bạn bên dưới.</p>
 
-  <!-- NOTIFY BAR -->
   <div class="notify-bar visible" id="notifyBar">
     <span>🔔</span>
     <button class="btn-notify" id="btnNotify" onclick="setupNotify()">Bật thông báo</button>
@@ -197,6 +263,10 @@
   </div>
 </div>
 
+</div><!-- /gyroWrap -->
+
+<button id="gyroBtn" onclick="requestGyro()">📱 Bật ly tâm</button>
+
 <script>
   /* ── STORAGE ── */
   function loadAccounts() {
@@ -223,16 +293,90 @@
       const fresh = accounts.find(a => a.id === session.id);
       showDashboard(fresh || session);
     }
+    initGyro();
   });
+
+  /* ── GYRO / TILT ── */
+  const wrap    = document.getElementById('gyroWrap');
+  const gyroBtn = document.getElementById('gyroBtn');
+  let gyroEnabled = false;
+  let smoothX = 0, smoothY = 0;
+  let rafId = null;
+  let targetX = 0, targetY = 0;
+  const MAX_TILT = 12;
+  const LERP = 0.07;
+
+  function lerpLoop() {
+    smoothX += (targetX - smoothX) * LERP;
+    smoothY += (targetY - smoothY) * LERP;
+    wrap.style.transform = `rotateX(${smoothX}deg) rotateY(${smoothY}deg)`;
+    rafId = requestAnimationFrame(lerpLoop);
+  }
+
+  function onDeviceOrientation(e) {
+    if (!gyroEnabled) return;
+    const beta  = Math.max(-MAX_TILT, Math.min(MAX_TILT, ((e.beta  || 0) - 45) * 0.3));
+    const gamma = Math.max(-MAX_TILT, Math.min(MAX_TILT, (e.gamma || 0) * 0.3));
+    targetX = -beta;
+    targetY = gamma;
+  }
+
+  function initGyro() {
+    // Start lerp loop
+    lerpLoop();
+
+    // Desktop mouse tilt
+    document.addEventListener('mousemove', (e) => {
+      if (gyroEnabled) return;
+      const cx = window.innerWidth  / 2;
+      const cy = window.innerHeight / 2;
+      targetX = -((e.clientY - cy) / cy) * MAX_TILT * 0.5;
+      targetY =  ((e.clientX - cx) / cx) * MAX_TILT * 0.5;
+    });
+
+    document.addEventListener('mouseleave', () => {
+      if (!gyroEnabled) { targetX = 0; targetY = 0; }
+    });
+
+    // Mobile
+    if (window.DeviceOrientationEvent) {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ — cần xin phép
+        gyroBtn.classList.add('visible');
+      } else {
+        // Android / older iOS
+        window.addEventListener('deviceorientation', onDeviceOrientation);
+        gyroEnabled = true;
+      }
+    }
+  }
+
+  function requestGyro() {
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        gyroEnabled = true;
+        window.addEventListener('deviceorientation', onDeviceOrientation);
+        gyroBtn.textContent = '✅ Ly tâm ON';
+        gyroBtn.classList.add('active-gyro');
+      } else {
+        gyroBtn.textContent = '❌ Bị từ chối';
+      }
+    }).catch(() => { gyroBtn.textContent = '❌ Lỗi'; });
+  }
 
   /* ── MODAL ── */
   function openModal(type) {
     document.getElementById('overlay').classList.add('active');
-    document.getElementById('modalLogin').style.display    = type === 'login'    ? 'block' : 'none';
-    document.getElementById('modalRegister').style.display = type === 'register' ? 'block' : 'none';
+    document.getElementById('modalLogin').style.display    = type === 'login'    ? 'flex' : 'none';
+    document.getElementById('modalRegister').style.display = type === 'register' ? 'flex' : 'none';
+    document.body.style.overflow = 'hidden';
     clearMsgs();
   }
-  function closeModal()  { document.getElementById('overlay').classList.remove('active'); clearMsgs(); }
+  function closeModal()  {
+    document.getElementById('overlay').classList.remove('active');
+    document.body.style.overflow = '';
+    clearMsgs();
+  }
   function closeOnBg(e)  { if (e.target === document.getElementById('overlay')) closeModal(); }
   function clearMsgs()   { ['loginMsg','registerMsg'].forEach(id => { const el = document.getElementById(id); el.textContent = ''; el.className = 'msg'; }); }
   function showMsg(id, text, type) { const el = document.getElementById(id); el.textContent = text; el.className = 'msg ' + type; }
@@ -240,8 +384,8 @@
   /* ── AUTH ── */
   function doLogin() {
     const accounts = loadAccounts();
-    const id  = document.getElementById('loginId').value.trim();
-    const pw  = document.getElementById('loginPw').value;
+    const id = document.getElementById('loginId').value.trim();
+    const pw = document.getElementById('loginPw').value;
     if (!id || !pw) return showMsg('loginMsg', 'Vui lòng điền đầy đủ thông tin.', 'error');
     const acc = accounts.find(a => a.id === id && a.pw === pw);
     if (!acc) return showMsg('loginMsg', 'ID hoặc mật khẩu không đúng.', 'error');
@@ -299,7 +443,7 @@
 
   /* ── RPC ── */
   function toggleRpcPanel() {
-    const body = document.getElementById('rpcBody');
+    const body  = document.getElementById('rpcBody');
     const arrow = document.getElementById('rpcArrow');
     arrow.textContent = body.classList.toggle('open') ? '▴' : '▾';
   }
@@ -362,6 +506,8 @@
     document.getElementById('navLinks').innerHTML = navHTML;
   }
 
+  function logout() { clearSession(); location.reload(); }
+
   /* ── ADMIN ── */
   function openAdminPage() {
     const session = loadSession();
@@ -408,6 +554,8 @@
     document.getElementById('adminPage').classList.add('active');
   }
 
+  function closeAdminPage() { document.getElementById('adminPage').classList.remove('active'); }
+
   function deleteUser(userId) {
     if (!confirm(`Xoá tài khoản "${userId}"? Không thể hoàn tác.`)) return;
     let accounts = loadAccounts();
@@ -416,14 +564,10 @@
     openAdminPage();
   }
 
-  /* ── EXPORT TXT — chỉ user, không có admin, không có token/channel/id_user ── */
   function exportTXT() {
     const accounts = loadAccounts();
     const users = accounts.filter(a => a.role !== 'admin');
-    let lines = [];
-    lines.push('=== DANH SÁCH TÀI KHOẢN ===');
-    lines.push(`Xuất lúc: ${new Date().toLocaleString('vi-VN')}`);
-    lines.push('');
+    let lines = ['=== DANH SÁCH TÀI KHOẢN ===', `Xuất lúc: ${new Date().toLocaleString('vi-VN')}`, ''];
     users.forEach((acc, i) => {
       lines.push(`[${i + 1}] ${acc.name}`);
       lines.push(`  ID đăng nhập : ${acc.id}`);
@@ -434,97 +578,18 @@
     });
     if (users.length === 0) lines.push('Chưa có tài khoản nào.');
     const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `accounts.txt`;
-    a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'accounts.txt'; a.click();
   }
 
   function exportJSON() {
     const accounts = loadAccounts();
     const blob = new Blob([JSON.stringify(accounts, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `ht-accounts-${new Date().toISOString().slice(0,10)}.json`;
-    a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'accounts.json'; a.click();
   }
 
-  function closeAdminPage() { document.getElementById('adminPage').classList.remove('active'); }
-
-  /* ── WEB PUSH ── */
-  const VAPID_PUBLIC_KEY = 'BC55qvmm8kBX8uwExyQZJRTdpX_tH29yhdun4nJ9jMKoK74QtdyZjlWIgSTe-Dwz3S6RLHgP7HfeO73KaTMY3Mw';
-
-  function urlBase64ToUint8Array(b64) {
-    const pad = '='.repeat((4 - b64.length % 4) % 4);
-    const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
-    return new Uint8Array([...atob(base64)].map(c => c.charCodeAt(0)));
-  }
-
-  async function setupNotify() {
-    const btn    = document.getElementById('btnNotify');
-    const status = document.getElementById('notifyStatus');
-
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      status.textContent = '❌ Trình duyệt không hỗ trợ'; return;
-    }
-
-    btn.disabled = true;
-    status.textContent = 'Đang xin quyền...';
-
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') {
-      status.textContent = '❌ Bị từ chối — vào Settings Chrome bật lại';
-      btn.disabled = false; return;
-    }
-
-    try {
-      const reg = await navigator.serviceWorker.register('/service-worker.js');
-      await navigator.serviceWorker.ready;
-
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-
-      const res = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub)
-      });
-
-      if (res.ok) {
-        btn.textContent = '✅ Đã bật';
-        btn.disabled = true;
-        status.textContent = 'Thông báo hoạt động!';
-        localStorage.setItem('ht_notify_subscribed', '1');
-      } else {
-        throw new Error('Server lỗi');
-      }
-    } catch (e) {
-      status.textContent = '❌ Lỗi: ' + e.message;
-      btn.disabled = false;
-    }
-  }
-
-  /* Ẩn nút nếu đã subscribe rồi */
-  window.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('ht_notify_subscribed')) {
-      const btn = document.getElementById('btnNotify');
-      const status = document.getElementById('notifyStatus');
-      if (btn) { btn.textContent = '✅ Đã bật'; btn.disabled = true; }
-      if (status) status.textContent = 'Thông báo hoạt động!';
-    }
-  });
-
-  function logout() {
-    clearSession();
-    document.getElementById('heroSection').style.display = '';
-    document.getElementById('dashboard').classList.remove('active');
-    document.getElementById('btnGotoProfile').classList.remove('visible');
-    document.getElementById('navLinks').innerHTML =
-      `<button class="btn-login" onclick="openModal('login')">Đăng nhập</button>
-       <button class="btn-register" onclick="openModal('register')">Đăng ký</button>`;
-  }
+  function setupNotify() {}
 </script>
 </body>
 </html>
