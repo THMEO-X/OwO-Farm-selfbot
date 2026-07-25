@@ -30,7 +30,7 @@
 > 2. cp -r /storage/emulated/0/download/OwO-Farm-selfbot-main.zip ~/
 > 3. pkg install unzip
 > 4. unzip OwO-Farm-selfbot-main.zip
-> 5. cd xyz-main
+> 5. cd OwO-Farm-selfbot-main
 6. 
 ```
 pkg update
@@ -48,10 +48,11 @@ pkg update
    npm install node-cron
   npm install web-push
   npm install axios-cookiejar-support tough-cookie
+node index.js
 ```
     
 > 7. You just need to wait for the entire package to finish running. After the port link appears, click on it to register an account and fill in your personal information. After that, Select "View your information" > "Edit" and then click "Save".
-> 8. After running setup.js the first time, you only need to run `node index.js`.
+> 8. to run ```node index.js```
 
 
 
