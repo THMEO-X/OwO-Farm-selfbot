@@ -31,23 +31,23 @@
 > 3. pkg install unzip
 > 4. unzip OwO-Farm-selfbot-main.zip
 > 5. cd xyz-main
-> 6. ```
-> pkg update
-> pkg install nodejs-lts
-> pkg install libvips
-> pkg update
-> pkg install nodejs-lts
-> pkg install libvips
->  npm install axios
->   npm install chokidar
->   npm install debug
->   npm install discord.js-selfbot-v13
->   npm install dotenv
->   npm install express
->   npm install node-cron
->  npm install web-push
->  npm install axios-cookiejar-support tough-cookie
->    ```
+ 6. ```
+ pkg update
+ pkg install nodejs-lts
+ pkg install libvips
+ pkg update
+ pkg install nodejs-lts
+ pkg install libvips
+  npm install axios
+   npm install chokidar
+   npm install debug
+   npm install discord.js-selfbot-v13
+   npm install dotenv
+   npm install express
+   npm install node-cron
+  npm install web-push
+  npm install axios-cookiejar-support tough-cookie
+    ```
 > 7. You just need to wait for the entire package to finish running. After the port link appears, click on it to register an account and fill in your personal information. After that, Select "View your information" > "Edit" and then click "Save".
 > 8. After running setup.js the first time, you only need to run `node index.js`.
 
