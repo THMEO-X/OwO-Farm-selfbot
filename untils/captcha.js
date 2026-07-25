@@ -229,6 +229,27 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     if (typeof client.broadcast === "function") {
       client.broadcast({ action: "update", type: "botstatus", status: "Running", global: state });
     }
-    console.log(` resume${idUser} — channel ${channelId} `);
+    console.log(`resume ${idUser} — channel ${channelId}`);
+  });
+
+  // DM verified auto resume
+  client.on("messageCreate", (message) => {
+    if (message.channel.type !== "DM") return;
+    if (message.author.id !== OWO_ID) return;
+    if (message.channel.recipient?.id !== idUser) return;
+
+    const clean = removeInvisibleChars(message.content).toLowerCase();
+    if (
+  !clean.includes("i have verified that you are human! thank you!") 
+) return;
+
+    state.captcha = false;
+    state.paused  = false;
+
+    if (typeof client.broadcast === "function") {
+      client.broadcast({ action: "update", type: "botstatus", status: "Running", global: state });
+    }
+    console.log(`[DM VERIFIED] auto resume ${idUser} — channel ${channelId}`);
   });
 };
+      
