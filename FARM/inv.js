@@ -2,7 +2,7 @@
 // Unauthorized copying, distribution, or modification of this file is prohibited.
 // This software is proprietary and confidential.
 // Contact the author for licensing information.
-
+// FARM/inv.js
 const OWO_ID = "408785106942164992";
 const delay  = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -14,11 +14,11 @@ const GEM_CODES = {
 
 const GEM_PREFIXES = ["cgem", "ugem", "rgem", "egem", "mgem", "lgem", "fgem"];
 
-const ITEM_MAP = [
-  { code: "050", key: "lb",      cmd: "lb"             },
-  { code: "049", key: "lotboxf", cmd: "lootbox fabled" },
-  { code: "100", key: "wc",      cmd: "wc"             },
-];
+const ITEM_CONFIG = {
+  "050": { key: "lb",      cmd: () => `owo lb ${["all","all","all"][Math.floor(Math.random()*1)]}` },
+  "049": { key: "lotboxf", cmd: () => `owo lb f` },
+  "100": { key: "wc",      cmd: () => `owo wc all` },
+};
 
 function hasGemInContent(content, gemNumber) {
   return GEM_PREFIXES.some((prefix) =>
@@ -26,44 +26,23 @@ function hasGemInContent(content, gemNumber) {
   );
 }
 
-async function useItems(client, channel, values, invConfig) {
-  for (const item of ITEM_MAP) {
-    if (!invConfig[item.key]) continue;
-    if (!values.includes(item.code)) continue;
-    await channel.send(`owo ${item.cmd} all`);
-    await delay(2500);
-  }
-}
-
-async function fetchAndUseGems(client, channel, global, config, missingGems, invMsgId) {
+async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
   const invReply = await waitForInvReply(client, channel, invMsgId);
 
   if (!invReply) {
+    console.log(`[${channel.name}] no inv , rsm farm`);
     global.gemChecking = false;
     return;
   }
 
   const values = [];
-
-  const backtickRegex = /`([^`]+)`/g;
+  const regex  = /`([^`]+)`/g;
   let match;
-  while ((match = backtickRegex.exec(invReply.content)) !== null) {
-    const code = match[1].trim().slice(0, 3);
-    if (!values.includes(code)) values.push(code);
+  while ((match = regex.exec(invReply.content)) !== null) {
+    values.push(match[1]);
   }
 
-  if (values.length === 0) {
-    const invMatch = invReply.content.match(/Inventory:\s*([\d,\s]+)/);
-    if (invMatch) {
-      invMatch[1].split(",").forEach((c) => {
-        const code = c.trim().slice(0, 3);
-        if (code && !values.includes(code)) values.push(code);
-      });
-    }
-  }
-
-  const invConfig = config?.inv ?? {};
-  await useItems(client, channel, values, invConfig);
+  console.log(`[${channel.name}] Inventory: ${values.join(", ")}`);
 
   let gemsToUse = "";
   for (const gemName of missingGems) {
@@ -71,21 +50,46 @@ async function fetchAndUseGems(client, channel, global, config, missingGems, inv
     for (const code of codes) {
       if (values.includes(code)) {
         gemsToUse += `${code} `;
+        console.log(`[${channel.name}] ${gemName} ${code}`);
         break;
       }
     }
   }
 
-  if (!gemsToUse.trim()) {
-    global.gemChecking = false;
+  if (gemsToUse.trim()) {
+    await delay(1000);
+    await channel.send(`owo use ${gemsToUse.trim()}`);
+    console.log(`[${channel.name}] used: ${gemsToUse.trim()}`);
+    await delay(2000);
+  } else {
+    console.log(`[${channel.name}] no gem`);
+  }
+
+  await handleItems(client, channel, values);
+
+  global.gemChecking = false;
+  console.log(`[${channel.name}] resume farm`);
+}
+
+async function handleItems(client, channel, values) {
+  let config;
+  try {
+    config = require("../config").inv;
+  } catch {
+    console.log(`[${channel.name}] no config`);
     return;
   }
 
-  await delay(1000);
-  await channel.send(`owo use ${gemsToUse.trim()}`);
+  for (const [code, { key, cmd }] of Object.entries(ITEM_CONFIG)) {
+    if (!config[key]) continue;
+    if (!values.includes(code)) continue;
 
-  await delay(2000);
-  global.gemChecking = false;
+    const command = cmd();
+    await delay(1000);
+    await channel.send(command);
+    console.log(`[${channel.name}] item ${code} → ${command}`);
+    await delay(1500);
+  }
 }
 
 function waitForInvReply(client, channel, invMsgId) {
@@ -97,7 +101,7 @@ function waitForInvReply(client, channel, invMsgId) {
         msg.author.id === OWO_ID &&
         msg.channel.id === channel.id &&
         msg.id > invMsgId &&
-        msg.content.includes("Inventory")
+        msg.content.includes("Inventory =")
       ) {
         if (!done) {
           done = true;
@@ -119,8 +123,10 @@ function waitForInvReply(client, channel, invMsgId) {
   });
 }
 
-module.exports = function startGemWatcher(client, channelId, global, config) {
+module.exports = function startGemWatcher(client, channelId, global) {
   if (!channelId) return;
+
+  console.log(`channel: ${channelId}`);
 
   client.on("messageCreate", async (message) => {
     if (message.author.id !== OWO_ID) return;
@@ -135,9 +141,10 @@ module.exports = function startGemWatcher(client, channelId, global, config) {
       global.hunt        = false;
       global.battle      = false;
 
+      console.log(`[${channel.name}] caught`);
       await delay(1000);
       const invMsg = await channel.send("owo inv");
-      await fetchAndUseGems(client, channel, global, config, ["gem1", "gem3", "gem4"], invMsg.id);
+      await fetchAndUseGems(client, channel, global, ["gem1", "gem3", "gem4"], invMsg.id);
       return;
     }
 
@@ -152,14 +159,18 @@ module.exports = function startGemWatcher(client, channelId, global, config) {
     if (!hasGem3) missingGems.push("gem3");
     if (!hasGem4) missingGems.push("gem4");
 
-    if (missingGems.length === 0) return;
+    if (missingGems.length === 0) {
+      console.log(`[${channel.name}] enough gems`);
+      return;
+    }
 
     global.gemChecking = true;
     global.hunt        = false;
     global.battle      = false;
 
+    console.log(`[${channel.name}] missing: ${missingGems.join(", ")}`);
     await delay(1000);
     const invMsg = await channel.send("owo inv");
-    await fetchAndUseGems(client, channel, global, config, missingGems, invMsg.id);
+    await fetchAndUseGems(client, channel, global, missingGems, invMsg.id);
   });
 };
