@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const pause = require('./Commands/pause');
 const CaptchaClient = require('./untils/captchaClient');
+const startGemItemWatcher = require('./FARM/gem');
 
 Keep_alive();
 
@@ -42,24 +43,36 @@ function attachCaptchaSolver(client, profileName, state) {
     console.log(c.yellow(`[${profileName}] Captcha detected — solving...`));
 
     const discordHeaders = {
-      Authorization: client.token,  // ← FIX: dùng client.token thay vì token từ event
+      Authorization: client.token,
       "Content-Type": "application/json",
       "User-Agent": "Mozilla/5.0",
     };
 
-    try {
-      const captcha = await CaptchaClient.create(process.env.YESCAPTCHA_API_KEY);
-      const channel = await client.channels.fetch(channelId);
-      const ok = await captcha.solveOwoBotCaptcha(discordHeaders, 3, channel);
+    const MAX_ATTEMPTS = 5;
+    const RETRY_DELAY  = 2500;
 
-      if (ok) {
-        console.log(c.green(`[${profileName}] Captcha solved + !TT sent!`));
-      } else {
-        console.log(c.red(`[${profileName}] Captcha solve failed.`));
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const captcha = await CaptchaClient.create(process.env.YESCAPTCHA_API_KEY);
+        const channel = await client.channels.fetch(channelId);
+        const ok      = await captcha.solveOwoBotCaptcha(discordHeaders, 3, channel);
+
+        if (ok) {
+          console.log(c.green(`[${profileName}] Captcha solved + !TT sent! (attempt ${attempt}/${MAX_ATTEMPTS})`));
+          return;
+        }
+
+        console.log(c.red(`[${profileName}] Attempt ${attempt}/${MAX_ATTEMPTS} failed.`));
+      } catch (e) {
+        console.log(c.red(`[${profileName}] Attempt ${attempt}/${MAX_ATTEMPTS} error: ${e.message}`));
       }
-    } catch (e) {
-      console.log(c.red(`[${profileName}] Solver error: ${e.message}`));
+
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise(r => setTimeout(r, RETRY_DELAY));
+      }
     }
+
+    console.log(c.red(`[${profileName}] Captcha gave up after ${MAX_ATTEMPTS} attempts.`));
   });
 }
 
@@ -101,6 +114,7 @@ function startClient(profileName, envPath) {
 
     farm(client, channelId, state);
     attachCaptchaSolver(client, profileName, state);
+    startGemItemWatcher(client, channelId);
   });
 
   client.on('invalidated', () => {
@@ -184,6 +198,7 @@ function startRootClient() {
 
     farm(client, channelId, state);
     attachCaptchaSolver(client, "root", state);
+    startGemItemWatcher(client, channelId);
   });
 
   client.on('invalidated', () => {
