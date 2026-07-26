@@ -21,11 +21,8 @@ function hasGemInContent(content, gemNumber) {
   );
 }
 
-// ✅ Helper để resume farm — gọi ở MỌI exit point
 function resumeFarm(global, channelName) {
   global.gemChecking = false;
-  global.hunt        = true;
-  global.battle      = true;
   console.log(`[${channelName}] ✅ Resume farm`);
 }
 
@@ -35,7 +32,7 @@ async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
 
     if (!invReply) {
       console.log(`[${channel.name}] Không nhận được inv, resume farm`);
-      resumeFarm(global, channel.name); // ✅ fix: resume thay vì chỉ reset gemChecking
+      resumeFarm(global, channel.name);
       return;
     }
 
@@ -62,7 +59,7 @@ async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
 
     if (!gemsToUse.trim()) {
       console.log(`[${channel.name}] Không có gem nào để dùng`);
-      resumeFarm(global, channel.name); // ✅ fix: resume thay vì chỉ reset gemChecking
+      resumeFarm(global, channel.name);
       return;
     }
 
@@ -71,9 +68,8 @@ async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
     console.log(`[${channel.name}] Đã dùng: ${gemsToUse.trim()}`);
 
     await delay(2000);
-    resumeFarm(global, channel.name); // ✅ exit point chính
+    resumeFarm(global, channel.name);
   } catch (err) {
-    // ✅ fix: catch mọi lỗi không mong muốn, không để kẹt pause
     console.error(`[${channel.name}] Lỗi fetchAndUseGems:`, err);
     resumeFarm(global, channel.name);
   }
@@ -123,10 +119,9 @@ module.exports = function startGemWatcher(client, channelId, global) {
     const channel = message.channel;
     const content = message.content;
 
+    // ─── Trigger 1: bắt được animal ──────────────────────────────
     if (content.includes("and caught an")) {
       global.gemChecking = true;
-      global.hunt        = false;
-      global.battle      = false;
 
       console.log(`[${channel.name}] Bắt được animal`);
       await delay(1000);
@@ -135,6 +130,7 @@ module.exports = function startGemWatcher(client, channelId, global) {
       return;
     }
 
+    // ─── Trigger 2: hunt is empowered by ─────────────────────────
     if (!content.includes("hunt is empowered by")) return;
 
     const hasGem1 = hasGemInContent(content, "1");
@@ -160,8 +156,6 @@ module.exports = function startGemWatcher(client, channelId, global) {
     }
 
     global.gemChecking = true;
-    global.hunt        = false;
-    global.battle      = false;
 
     console.log(`[${channel.name}] Thiếu gem: ${missingGems.join(", ")}`);
     await delay(1000);
