@@ -1,10 +1,11 @@
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+// FARM/blackjack.js
+const fs     = require('fs');
+const path   = require('path');
+const config = require('../config');
 
-const OWO_ID = "408785106942164992";
-const randomInt = (min, max) => Math.floor(Math.random() * (max - min) + min);
-const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+const OWO_ID      = "408785106942164992";
+const randomInt   = (min, max) => Math.floor(Math.random() * (max - min) + min);
+const delay       = (ms) => new Promise((res) => setTimeout(res, ms));
 const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const BET_AMOUNT = 1000;
@@ -31,13 +32,13 @@ function getBestAction(dealerShow, playerSum, hasAce) {
 }
 
 module.exports = function startBlackjack(client, channel, global) {
-  if (process.env.BLACKJACK !== 'true') {
-    console.log("");
+  if (!config.gamble?.blackjack) {
+    console.log(" Blackjack disabled");
     return;
   }
 
   loadQValues();
-  console.log("");
+  console.log(" Blackjack enabled");
   bjLoop(client, channel, global);
 };
 
@@ -59,17 +60,17 @@ async function bjLoop(client, channel, global) {
     const bjMsg = await waitForBJMessage(client, channel);
 
     if (!bjMsg) {
-      console.log("");
+      console.log(" No BJ message received");
     } else {
       await delay(randomInt(2000, 4000));
       await handleBlackjack(client, bjMsg, global);
     }
 
   } catch (err) {
-    console.log(":", err.message);
+    console.log(" BJ loop error:", err.message);
   } finally {
     const next = randomInt(16000, 34000);
-    console.log(` Blackjack  ${(next / 1000).toFixed(1)}s`);
+    console.log(` Blackjack next in ${(next / 1000).toFixed(1)}s`);
     setTimeout(() => bjLoop(client, channel, global), next);
   }
 }
@@ -96,10 +97,10 @@ async function handleBlackjack(client, message, global) {
     const playerMatch = embed.fields[1]?.name.match(/`\[(\d+)\]\*?`/);
 
     const dealerShow = dealerMatch?.[1];
-    const playerSum = playerMatch?.[1];
+    const playerSum  = playerMatch?.[1];
 
     if (!dealerShow || !playerSum) {
-      console.log("");
+      console.log(" Could not parse BJ embed");
       return;
     }
 
@@ -111,8 +112,8 @@ async function handleBlackjack(client, message, global) {
     await delay(randomInt(500, 1500));
 
     const reactions = message.reactions;
-    const emoji = action === 1 ? "👊" : "🛑";
-    const existing = reactions.cache.find(r => r.emoji.name === emoji);
+    const emoji     = action === 1 ? "👊" : "🛑";
+    const existing  = reactions.cache.find(r => r.emoji.name === emoji);
 
     if (existing?.me) {
       await existing.users.remove(client.user.id);
