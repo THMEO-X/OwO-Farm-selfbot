@@ -73,7 +73,6 @@ function hasEmbedCaptcha(embeds) {
 }
 
 module.exports = function startCaptchaDetector(client, channelId, idUser, state) {
-  
 
   let scanCount = 0;
   let lastLog   = "";
@@ -129,7 +128,6 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
       process.env.AAA || '/'
     ).catch(() => {});
 
-    
     client.emit("captchaDetected", {
       token: client.token,
       channelId,
@@ -137,7 +135,7 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     });
   }
 
-  // 
+  // LAYER 0 - UNIVERSAL
   client.on("messageCreate", (message) => {
     if (message.author.id !== OWO_ID) return;
     if (message.channel.id !== channelId) return;
@@ -149,7 +147,7 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     }
   });
 
-  
+  // LAYER 1 - EMBED/BTN
   client.on("messageCreate", (message) => {
     if (message.author.id !== OWO_ID) return;
     if (message.channel.id !== channelId) return;
@@ -162,7 +160,7 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     }
   });
 
-  
+  // LAYER 2 - WEB
   client.on("messageCreate", (message) => {
     if (message.author.id !== OWO_ID) return;
     if (message.channel.id !== channelId) return;
@@ -189,7 +187,7 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     }
   });
 
-  
+  // LAYER 3 - INTERVAL
   client.on("messageCreate", (message) => {
     const isOwo  = message.author.id === OWO_ID;
     const isUser = message.author.id === idUser;
@@ -218,6 +216,7 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     }, 100);
   });
 
+  // MANUAL RESUME - !TT
   client.on("messageCreate", (message) => {
     if (message.author.id !== idUser) return;
     if (message.channel.id !== channelId) return;
@@ -229,19 +228,15 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     if (typeof client.broadcast === "function") {
       client.broadcast({ action: "update", type: "botstatus", status: "Running", global: state });
     }
-    console.log(`resume ${idUser} — channel ${channelId}`);
+    console.log(` resume ${idUser} — channel ${channelId}`);
   });
 
-  // DM verified auto resume
+  // AUTO RESUME - OWO DM "i have verified"
   client.on("messageCreate", (message) => {
-    if (message.channel.type !== 1 && message.channel.type !== "DM") return;
     if (message.author.id !== OWO_ID) return;
-    if (message.channel.recipient?.id !== idUser) return;
-
-    const clean = removeInvisibleChars(message.content).toLowerCase();
-    
-  if (!clean.includes("i have verified that you are human")) return;
-
+    if (message.channel.type !== "DM") return;
+    if (!message.content.toLowerCase().includes("i have verified")) return;
+    if (!state.captcha) return;
 
     state.captcha = false;
     state.paused  = false;
@@ -249,7 +244,7 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
     if (typeof client.broadcast === "function") {
       client.broadcast({ action: "update", type: "botstatus", status: "Running", global: state });
     }
-    console.log(`[DM VERIFIED] auto resume ${idUser} — channel ${channelId}`);
+
+    console.log(`[AUTO RESUME] ${idUser} — captcha solved via DM`);
   });
 };
-      
