@@ -234,14 +234,14 @@ module.exports = function startCaptchaDetector(client, channelId, idUser, state)
 
   // DM verified auto resume
   client.on("messageCreate", (message) => {
-    if (message.channel.type !== "DM") return;
+    if (message.channel.type !== 1 && message.channel.type !== "DM") return;
     if (message.author.id !== OWO_ID) return;
     if (message.channel.recipient?.id !== idUser) return;
 
     const clean = removeInvisibleChars(message.content).toLowerCase();
-    if (
-  !clean.includes("i have verified that you are human! thank you!") 
-) return;
+    
+  if (!clean.includes("i have verified that you are human")) return;
+
 
     state.captcha = false;
     state.paused  = false;
