@@ -17,48 +17,50 @@ function hasGemInContent(content, gemNumber) {
 }
 
 async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
-  const invReply = await waitForInvReply(client, channel, invMsgId);
+  try {
+    const invReply = await waitForInvReply(client, channel, invMsgId);
 
-  if (!invReply) {
-    console.log(`[${channel.name}] no inv , rsm farm`);
-    global.gemChecking = false;
-    return;
-  }
+    if (!invReply) {
+      console.log(`[${channel.name}] no inv , rsm farm`);
+      return;
+    }
 
-  const values = [];
-  const regex  = /`([^`]+)`/g;
-  let match;
-  while ((match = regex.exec(invReply.content)) !== null) {
-    values.push(match[1]);
-  }
+    const values = [];
+    const regex  = /`([^`]+)`/g;
+    let match;
+    while ((match = regex.exec(invReply.content)) !== null) {
+      values.push(match[1]);
+    }
 
-  console.log(`[${channel.name}]  Inventory: ${values.join(", ")}`);
+    console.log(`[${channel.name}]  Inventory: ${values.join(", ")}`);
 
-  let gemsToUse = "";
-  for (const gemName of missingGems) {
-    const codes = GEM_CODES[gemName];
-    for (const code of codes) {
-      if (values.includes(code)) {
-        gemsToUse += `${code} `;
-        console.log(`[${channel.name}]  ${gemName}   ${code}`);
-        break;
+    let gemsToUse = "";
+    for (const gemName of missingGems) {
+      const codes = GEM_CODES[gemName];
+      for (const code of codes) {
+        if (values.includes(code)) {
+          gemsToUse += `${code} `;
+          console.log(`[${channel.name}]  ${gemName}   ${code}`);
+          break;
+        }
       }
     }
-  }
 
-  if (!gemsToUse.trim()) {
-    console.log(`[${channel.name}]  no gem`);
+    if (!gemsToUse.trim()) {
+      console.log(`[${channel.name}]  no gem`);
+      return;
+    }
+
+    await delay(1000);
+    await channel.send(`owo use ${gemsToUse.trim()}`);
+    console.log(`[${channel.name}]  : ${gemsToUse.trim()}`);
+
+    await delay(2000);
+    console.log(`[${channel.name}]  resume fram `);
+  } finally {
+    // ✅ FIX 1: luôn reset flag dù có lỗi hay không
     global.gemChecking = false;
-    return;
   }
-
-  await delay(1000);
-  await channel.send(`owo use ${gemsToUse.trim()}`);
-  console.log(`[${channel.name}]  : ${gemsToUse.trim()}`);
-
-  await delay(2000);
-  global.gemChecking = false;
-  console.log(`[${channel.name}]  resume fram `);
 }
 
 function waitForInvReply(client, channel, invMsgId) {
@@ -94,7 +96,6 @@ function waitForInvReply(client, channel, invMsgId) {
 
 module.exports = function startGemWatcher(client, channelId, global) {
   if (!channelId) {
- 
     return;
   }
 
@@ -108,21 +109,27 @@ module.exports = function startGemWatcher(client, channelId, global) {
     const channel = message.channel;
     const content = message.content;
 
-    // ─── : caught an ───────────────────────────────────
+    // ─── case 1: caught an ────────────────────────────────
     if (content.includes("and caught an")) {
       global.gemChecking = true;
       global.hunt        = false;
       global.battle      = false;
-      // ←  block send
 
       console.log(`[${channel.name}]  Caught an `);
       await delay(1000);
-      const invMsg = await channel.send("owo inv");
-      await fetchAndUseGems(client, channel, global, ["gem1", "gem3", "gem4"], invMsg.id);
+
+      // ✅ FIX 2: bọc try/catch
+      try {
+        const invMsg = await channel.send("owo inv");
+        await fetchAndUseGems(client, channel, global, ["gem1", "gem3", "gem4"], invMsg.id);
+      } catch (err) {
+        console.log(`[${channel.name}] ERROR: ${err.message} — force reset`);
+        global.gemChecking = false;
+      }
       return;
     }
 
-    // ───  2: hunt is empowered by ───────────────────────
+    // ─── case 2: hunt is empowered by ────────────────────
     if (!content.includes("hunt is empowered by")) return;
 
     const hasGem1 = hasGemInContent(content, "1");
@@ -150,11 +157,17 @@ module.exports = function startGemWatcher(client, channelId, global) {
     global.gemChecking = true;
     global.hunt        = false;
     global.battle      = false;
-    // ←  set global.paused
 
     console.log(`[${channel.name}]  burnt: ${missingGems.join(", ")} `);
     await delay(1000);
-    const invMsg = await channel.send("owo inv");
-    await fetchAndUseGems(client, channel, global, missingGems, invMsg.id);
+
+    // ✅ FIX 3: bọc try/catch
+    try {
+      const invMsg = await channel.send("owo inv");
+      await fetchAndUseGems(client, channel, global, missingGems, invMsg.id);
+    } catch (err) {
+      console.log(`[${channel.name}] ERROR: ${err.message} — force reset`);
+      global.gemChecking = false;
+    }
   });
 };
