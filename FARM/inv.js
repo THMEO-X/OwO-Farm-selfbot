@@ -2,9 +2,7 @@
 // Unauthorized copying, distribution, or modification of this file is prohibited.
 // This software is proprietary and confidential.
 // Contact the author for licensing information.
-//
 // FARM/inv.js
-    // FARM/inv.js
 const OWO_ID = "408785106942164992";
 const delay  = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -22,12 +20,15 @@ function hasGemInContent(content, gemNumber) {
   );
 }
 
-async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
+async function fetchAndUseGems(client, channel, global, missingGems, invMsgId, onResume) {
   const invReply = await waitForInvReply(client, channel, invMsgId);
 
   if (!invReply) {
-    console.log(`[${channel.name}] no inv , rsm farm`);
+    console.log(`[${channel.name}] no inv, rsm farm`);
     global.gemChecking = false;
+    global.hunt        = true;   // ← FIX: resume hunt
+    global.battle      = true;   // ← FIX: resume battle
+    if (onResume) onResume();
     return;
   }
 
@@ -38,7 +39,7 @@ async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
     values.push(match[1]);
   }
 
-  console.log(`[${channel.name}]  Inventory: ${values.join(", ")}`);
+  console.log(`[${channel.name}] Inventory: ${values.join(", ")}`);
 
   let gemsToUse = "";
   for (const gemName of missingGems) {
@@ -46,25 +47,31 @@ async function fetchAndUseGems(client, channel, global, missingGems, invMsgId) {
     for (const code of codes) {
       if (values.includes(code)) {
         gemsToUse += `${code} `;
-        console.log(`[${channel.name}]  ${gemName}   ${code}`);
+        console.log(`[${channel.name}] ${gemName} → ${code}`);
         break;
       }
     }
   }
 
   if (!gemsToUse.trim()) {
-    console.log(`[${channel.name}]  no gem`);
+    console.log(`[${channel.name}] no gem found`);
     global.gemChecking = false;
+    global.hunt        = true;   // ← FIX
+    global.battle      = true;   // ← FIX
+    if (onResume) onResume();
     return;
   }
 
   await delay(1000);
   await channel.send(`owo use ${gemsToUse.trim()}`);
-  console.log(`[${channel.name}]  : ${gemsToUse.trim()}`);
+  console.log(`[${channel.name}] used: ${gemsToUse.trim()}`);
 
   await delay(2000);
   global.gemChecking = false;
-  console.log(`[${channel.name}]  resume fram `);
+  global.hunt        = true;    // ← FIX
+  global.battle      = true;    // ← FIX
+  console.log(`[${channel.name}] resume farm`);
+  if (onResume) onResume();
 }
 
 function waitForInvReply(client, channel, invMsgId) {
@@ -98,13 +105,10 @@ function waitForInvReply(client, channel, invMsgId) {
   });
 }
 
-module.exports = function startGemWatcher(client, channelId, global) {
-  if (!channelId) {
- 
-    return;
-  }
+module.exports = function startGemWatcher(client, channelId, global, onResume) {
+  if (!channelId) return;
 
-  console.log(`  channel: ${channelId}`);
+  console.log(`gem watcher channel: ${channelId}`);
 
   client.on("messageCreate", async (message) => {
     if (message.author.id !== OWO_ID) return;
@@ -114,21 +118,20 @@ module.exports = function startGemWatcher(client, channelId, global) {
     const channel = message.channel;
     const content = message.content;
 
-    // ─── : caught an ───────────────────────────────────
+    // Trigger 1: caught an animal
     if (content.includes("and caught an")) {
       global.gemChecking = true;
       global.hunt        = false;
       global.battle      = false;
-      // ←  block send
 
-      console.log(`[${channel.name}]  Caught an `);
+      console.log(`[${channel.name}] caught → checking gems`);
       await delay(1000);
       const invMsg = await channel.send("owo inv");
-      await fetchAndUseGems(client, channel, global, ["gem1", "gem3", "gem4"], invMsg.id);
+      await fetchAndUseGems(client, channel, global, ["gem1", "gem3", "gem4"], invMsg.id, onResume);
       return;
     }
 
-    // ───  2: hunt is empowered by ───────────────────────
+    // Trigger 2: hunt empowered check
     if (!content.includes("hunt is empowered by")) return;
 
     const hasGem1 = hasGemInContent(content, "1");
@@ -141,26 +144,25 @@ module.exports = function startGemWatcher(client, channelId, global) {
     if (!hasGem4) missingGems.push("gem4");
 
     console.log(
-      `[${channel.name}] 💎 : ${
+      `[${channel.name}] gems active: ${
         [hasGem1 && "gem1", hasGem3 && "gem3", hasGem4 && "gem4"]
           .filter(Boolean)
-          .join(", ") || "không có"
+          .join(", ") || "none"
       }`
     );
 
     if (missingGems.length === 0) {
-      console.log(`[${channel.name}] enough `);
+      console.log(`[${channel.name}] all gems present`);
       return;
     }
 
     global.gemChecking = true;
     global.hunt        = false;
     global.battle      = false;
-    // ←  set global.paused
 
-    console.log(`[${channel.name}]  burnt: ${missingGems.join(", ")} `);
+    console.log(`[${channel.name}] missing: ${missingGems.join(", ")}`);
     await delay(1000);
     const invMsg = await channel.send("owo inv");
-    await fetchAndUseGems(client, channel, global, missingGems, invMsg.id);
+    await fetchAndUseGems(client, channel, global, missingGems, invMsg.id, onResume);
   });
 };
