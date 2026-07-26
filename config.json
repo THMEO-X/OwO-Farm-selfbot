@@ -19,7 +19,7 @@
     "lb": true,
     "lotboxf": false,
     "wc": true
-  }
+  },
   "gamble": {
     "blackjack": false
   }
