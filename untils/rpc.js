@@ -1,6 +1,6 @@
 const { RichPresence } = require("discord.js-selfbot-v13");
 const chalk = require("chalk");
-const cfg = require("./config");
+const cfg = require("../config");
 
 function rpc(client, config) {
     const status = new RichPresence(client)
