@@ -1,5 +1,5 @@
 // huntbot.js
-const config = require('./config');
+const config = require('../config');
 const solveHuntbotCaptcha = require('./huntbot_captcha/huntbotcaptcha');
 const startCaptchaDetector = require('../untils/captcha');
 
