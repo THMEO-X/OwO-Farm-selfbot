@@ -1,3 +1,4 @@
+
 require('dotenv').config({ silent: true });
 const { Client } = require('discord.js-selfbot-v13');
 const farm = require('./FARM/farm');
@@ -7,7 +8,6 @@ const path = require('path');
 const fs = require('fs');
 const pause = require('./Commands/pause');
 const CaptchaClient = require('./untils/captchaClient');
-const startGemItemWatcher = require('./FARM/gem');
 
 Keep_alive();
 
@@ -114,7 +114,6 @@ function startClient(profileName, envPath) {
 
     farm(client, channelId, state);
     attachCaptchaSolver(client, profileName, state);
-    startGemItemWatcher(client, channelId);
   });
 
   client.on('invalidated', () => {
@@ -198,7 +197,6 @@ function startRootClient() {
 
     farm(client, channelId, state);
     attachCaptchaSolver(client, "root", state);
-    startGemItemWatcher(client, channelId);
   });
 
   client.on('invalidated', () => {
