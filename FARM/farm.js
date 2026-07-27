@@ -8,8 +8,6 @@ const startDailyTimer = require('../untils/daily');
 const startBlackjack = require('../gamble/blackjack');
 const startHuntbot = require('../huntbot/huntbot');
 
-
-
 const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const randomDelay = (min, max) => Math.floor(Math.random() * (max - min) + min);
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -26,7 +24,6 @@ module.exports = async function farm(client, channelId, state) {
   const channel = client.channels.cache.get(channelId);
 
   if (!channel) {
-    
     return;
   }
 
@@ -40,40 +37,39 @@ module.exports = async function farm(client, channelId, state) {
   if (global.hunt        === undefined) global.hunt        = false;
   if (global.battle      === undefined) global.battle      = false;
 
-  // ─── Client Health Check ──────────────────────────────────────
   function isClientAlive() {
-    return client?.ws?.status === 0; // 0 = READY
+    return client?.ws?.status === 0;
   }
 
-  // ─── Auto Pause ───────────────────────────────────────────────
   function startAutoPause() {
     const runTime   = randomDelay(15 * 60 * 1000, 30 * 60 * 1000);
     const pauseTime = randomDelay( 5 * 60 * 1000,  7 * 60 * 1000);
 
-    console.log(`[${tag}]  pause  ${(runTime / 60000).toFixed(1)} phút`);
+    console.log(`[${tag}] next pause in ${(runTime / 60000).toFixed(1)}m`);
 
     setTimeout(() => {
       global.paused = true;
-      console.log(`[${tag}] Auto pause  ${(pauseTime / 60000).toFixed(1)} phút`);
+      console.log(`[${tag}] auto paused for ${(pauseTime / 60000).toFixed(1)}m`);
 
-      setTimeout(() => {
-        if (!global.captcha && !global.gemChecking) {
-          global.paused = false;
-          console.log(`[${tag}] Auto resume `);
-        } else {
-          console.log(`[${tag}]  Resume  hold — captcha/gem active`);
+      const waitAndResume = () => {
+        if (global.captcha || global.gemChecking) {
+          console.log(`[${tag}] resume hold — captcha/gem still active, retrying in 5s`);
+          setTimeout(waitAndResume, 5000);
+          return;
         }
+        global.paused = false;
+        console.log(`[${tag}] auto resumed`);
         startAutoPause();
-      }, pauseTime);
+      };
+
+      setTimeout(waitAndResume, pauseTime);
     }, runTime);
   }
 
-  // ─── Blocked Check ────────────────────────────────────────────
   function isBlocked() {
     return global.paused || global.captcha || global.gemChecking;
   }
 
-  // ─── Hunt ─────────────────────────────────────────────────────
   async function hunt() {
     const interval    = randomDelay(15000, 25000);
     const scheduledAt = Date.now();
@@ -89,7 +85,7 @@ module.exports = async function farm(client, channelId, state) {
       await channel.sendTyping();
 
       if (isBlocked() || global.battle) {
-        console.log(`[${tag}]  Hunt abort`);
+        console.log(`[${tag}] Hunt abort`);
         return;
       }
 
@@ -97,11 +93,11 @@ module.exports = async function farm(client, channelId, state) {
         `${randomChoice(["owo", "owo"])} ${randomChoice(["h", "hunt"])}`
       );
       stats.hunt++;
-      console.log(`[${tag}]  Hunt #${stats.hunt} — ${timestamp()}`);
+      console.log(`[${tag}] Hunt #${stats.hunt} — ${timestamp()}`);
 
       if (stats.hunt % 3 === 0) {
         notify(
-          ` Farm ${tag} — ${stats.hunt} hunt`,
+          `Farm ${tag} — ${stats.hunt} hunt`,
           `Đã farm được ${stats.hunt} lần hunt!`,
           '/'
         ).catch(() => {});
@@ -109,17 +105,16 @@ module.exports = async function farm(client, channelId, state) {
 
       sendPhrase();
     } catch (err) {
-   
+      console.error(`[${tag}] hunt error:`, err);
     } finally {
       global.hunt = false;
       const elapsed = Date.now() - scheduledAt;
       const next    = Math.max(0, interval - elapsed);
-      console.log(`[${tag}] hunt ${(next / 1000).toFixed(1)}s`);
+      console.log(`[${tag}] next hunt in ${(next / 1000).toFixed(1)}s`);
       setTimeout(hunt, next);
     }
   }
 
-  // ─── Battle ───────────────────────────────────────────────────
   async function battle() {
     const interval    = randomDelay(15000, 25000);
     const scheduledAt = Date.now();
@@ -142,31 +137,30 @@ module.exports = async function farm(client, channelId, state) {
       await channel.send(
         `${randomChoice(["owo", "owo"])} ${randomChoice(["b", "battle"])}`
       );
-      stats.battle++; 
-      console.log(`[${tag}]  Battle #${stats.battle} — ${timestamp()}`);
+      stats.battle++;
+      console.log(`[${tag}] Battle #${stats.battle} — ${timestamp()}`);
 
       if (stats.battle % 3 === 0) {
         notify(
-          ` Farm ${tag} — ${stats.battle} battle`,
+          `Farm ${tag} — ${stats.battle} battle`,
           `Đã farm được ${stats.battle} lần battle!`,
           '/'
         ).catch(() => {});
       }
     } catch (err) {
-      
+      console.error(`[${tag}] battle error:`, err);
     } finally {
       global.battle = false;
       const elapsed = Date.now() - scheduledAt;
       const next    = Math.max(0, interval - elapsed);
-      console.log(`[${tag}] battle ${(next / 1000).toFixed(1)}s`);
+      console.log(`[${tag}] next battle in ${(next / 1000).toFixed(1)}s`);
       setTimeout(battle, next);
     }
   }
 
-  // ─── Phrase ───────────────────────────────────────────────────
   async function sendPhrase() {
     if (!isClientAlive() || global.paused || global.captcha) {
-      console.log(`[${tag}] Phrase skip `);
+      console.log(`[${tag}] Phrase skip`);
       return;
     }
 
@@ -177,7 +171,6 @@ module.exports = async function farm(client, channelId, state) {
       const { phrases } = JSON.parse(data);
 
       if (!phrases?.length) {
-        
         return;
       }
 
@@ -186,29 +179,28 @@ module.exports = async function farm(client, channelId, state) {
       await delay(randomDelay(800, 1500));
 
       if (!isClientAlive() || global.paused || global.captcha) {
-        console.log(`[${tag}] Phrase skip `);
+        console.log(`[${tag}] Phrase skip`);
         return;
       }
 
       await channel.send(phrase);
-      console.log(`[${tag}]  Phrase: "${phrase}" — ${timestamp()}`);
+      console.log(`[${tag}] Phrase: "${phrase}" — ${timestamp()}`);
     } catch (err) {
-      
+      console.error(`[${tag}] phrase error:`, err);
     }
   }
 
-  // ─── Boot ─────────────────────────────────────────────────────
-  console.log(`[${tag}] Farm start : ${channel.name}`);
+  console.log(`[${tag}] Farm start: ${channel.name}`);
 
   startCaptchaDetector(client, channelId, client.user.id, global);
   startAutoPause();
- 
   startGemWatcher(client, channelId, global);
   startStatsCommand(client, stats);
   startRPC(client);
- new startDailyTimer(client, channelId);
+  new startDailyTimer(client, channelId);
   startBlackjack(client, channel, global);
-startHuntbot(client, channelId, global);
+  startHuntbot(client, channelId, global);
+
   hunt();
   await delay(2000);
   battle();
