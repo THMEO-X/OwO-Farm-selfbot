@@ -116,10 +116,17 @@ module.exports = function startGemWatcher(client, channelId, global) {
       global.hunt        = false;
       global.battle      = false;
 
-      console.log(`[${channel.name}] caught — checking gems`);
-      await delay(1000);
-      const invMsg = await channel.send("owo inv");
-      await fetchAndUseGems(client, channel, global, ["gem1", "gem3", "gem4"], invMsg.id);
+      try {
+        console.log(`[${channel.name}] caught — checking gems`);
+        await delay(1000);
+        const invMsg = await channel.send("owo inv");
+        await fetchAndUseGems(client, channel, global, ["gem1", "gem3", "gem4"], invMsg.id);
+      } catch (err) {
+        console.log(`[${channel.name}] lỗi inv (caught): ${err.message}`);
+        global.gemChecking = false;
+        global.hunt        = false;
+        global.battle      = false;
+      }
       return;
     }
 
@@ -151,9 +158,17 @@ module.exports = function startGemWatcher(client, channelId, global) {
     global.hunt        = false;
     global.battle      = false;
 
-    console.log(`[${channel.name}] missing: ${missingGems.join(", ")}`);
-    await delay(1000);
-    const invMsg = await channel.send("owo inv");
-    await fetchAndUseGems(client, channel, global, missingGems, invMsg.id);
+    try {
+      console.log(`[${channel.name}] missing: ${missingGems.join(", ")}`);
+      await delay(1000);
+      const invMsg = await channel.send("owo inv");
+      await fetchAndUseGems(client, channel, global, missingGems, invMsg.id);
+    } catch (err) {
+      console.log(`[${channel.name}] lỗi inv (empowered): ${err.message}`);
+      global.gemChecking = false;
+      global.hunt        = false;
+      global.battle      = false;
+    }
   });
 };
+      
