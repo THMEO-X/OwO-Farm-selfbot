@@ -15,8 +15,12 @@
     "upgrade": false,
     "upgradetype": ""
   },
-  
   "gamble": {
     "blackjack": false
+  },
+  "gem": {
+    "lb": true,
+    "lotboxf": false,
+    "wc": true
   }
 }
