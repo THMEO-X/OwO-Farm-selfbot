@@ -1,141 +1,82 @@
-// utils/daily.js
-const fs = require("fs");
-const path = require("path");
-const schedule = require("node-cron");
+// Copyright (c) 2026 HT. All rights reserved.
+// Unauthorized copying, distribution, or modification of this file is prohibited.
+// This software is proprietary and confidential.
+// Contact the author for licensing information
+const OWO_ID = "408785106942164992";
+const delay  = (ms) => new Promise((res) => setTimeout(res, ms));
 
-const STATS_PATH = path.join(__dirname, "./stats.json");
+// "You need to wait **2H 48M 2S**" -> 2*3600 + 48*60 + 2 (giây)
+function parseWaitSeconds(content) {
+  const match = content.match(
+    /You need to wait \*\*(?:(\d+)H)?\s*(?:(\d+)M)?\s*(?:(\d+)S)?\*\*/i
+  );
+  if (!match) return null;
 
-function loadJson() {
-  return JSON.parse(fs.readFileSync(STATS_PATH, "utf-8"));
+  const h = parseInt(match[1] || "0", 10);
+  const m = parseInt(match[2] || "0", 10);
+  const s = parseInt(match[3] || "0", 10);
+
+  if (!h && !m && !s) return null;
+  return h * 3600 + m * 60 + s;
 }
 
-function saveJson(data) {
-  fs.writeFileSync(STATS_PATH, JSON.stringify(data, null, 4), "utf-8");
-}
+module.exports = function startDailyTimer(client, channelId) {
+  if (!channelId) return { onHuntSuccess: () => {} };
 
-function timeInSeconds() {
-  return Math.floor(Date.now() / 1000);
-}
+  const state = {
+    huntCount: 0,
+    pending:   false, // true = đang chờ owo daily xử lý (chờ reply hoặc chờ cooldown)
+  };
 
-class Daily {
-  constructor(bot) {
-    this.bot = bot;
-    this._cronJob = null;
-  }
-
-  get cooldowns() {
-    return this.bot.settingsDict.cooldowns;
-  }
-
-  startDailyTimer(client, channelId) {
-    this._cronJob = schedule.schedule(
-      "0 0 8 * * *",
-      async () => {
-        const channel = client.channels.cache.get(channelId);
-        if (!channel) {
-          console.log("Daily timer: khong tim thay channel");
-          return;
-        }
-
-        try {
-          await channel.send("owo daily");
-          console.log(
-            `Daily gui luc 15:00 VN — ${new Date().toLocaleString("vi-VN", {
-              timeZone: "Asia/Ho_Chi_Minh",
-            })}`
-          );
-        } catch (err) {}
-      },
-      { timezone: "Asia/Ho_Chi_Minh" }
-    );
-  }
-
-  async startDaily() {
-    const accounts = loadJson();
-    const userId = String(this.bot.user.id);
-
-    if (accounts[userId]) {
-      const lastDailyTime = accounts[userId].daily || 0;
-
-      if (!this.bot.shouldRun(lastDailyTime)) {
-        await this.bot.sleepTill(this.bot.calcTime());
-      }
-
-      await this.bot.sleepTill(this.cooldowns.briefCooldown);
-      await this.bot.putQueue(
-        { cmd_name: "daily", prefix: true, checks: true, id: "daily" },
-        { priority: true }
-      );
-      await this.bot.setStat(false);
+  async function sendDaily(channel) {
+    try {
+      await delay(1000);
+      await channel.send("owo daily");
+      console.log(`[${channel.name}] daily.js: đã gửi owo daily`);
+    } catch (err) {
+      console.log(`[${channel.name}] daily.js: lỗi gửi owo daily: ${err.message}`);
+      state.pending = false; // cho phép thử lại vào lần hunt x3 tiếp theo
     }
   }
 
-  async onCogLoad(client, channelId) {
-    if (!this.bot.settingsDict.daily) {
-      await this.bot.unloadCog("core.cogs.daily");
+  client.on("messageCreate", (message) => {
+    if (message.author.id !== OWO_ID) return;
+    if (message.channel.id !== channelId) return;
+    if (!state.pending) return;
+
+    const channel = message.channel;
+    const content = message.content;
+
+    if (content.includes("Here is your daily")) {
+      console.log(`[${channel.name}] daily.js: claim daily thành công`);
+      state.pending   = false;
+      state.huntCount = 0;
       return;
     }
 
-    this.startDailyTimer(client, channelId);
-    this.startDaily();
-  }
-
-  async onCogUnload() {
-    if (this._cronJob) {
-      this._cronJob.stop();
+    const waitSeconds = parseWaitSeconds(content);
+    if (waitSeconds !== null) {
+      console.log(`[${channel.name}] daily.js: cần đợi ${waitSeconds}s (${content.match(/\*\*(.+?)\*\*/)?.[1] || ""}), sẽ tự gửi lại đúng lúc`);
+      setTimeout(() => {
+        sendDaily(channel);
+      }, waitSeconds * 1000);
     }
-    await this.bot.removeQueue({ id: "daily" });
-  }
+  });
 
-  async handleMessage(message) {
-    const nick = this.bot.getNick(message);
-    const cmd = { cmd_name: "daily", prefix: true, checks: true, id: "daily" };
+  return {
+    // gọi hàm này từ farm.js mỗi khi hunt gửi thành công
+    onHuntSuccess(channel) {
+      if (state.pending) return; // đang xử lý daily, không đếm hunt lúc này
 
-    if (
-      message.channel.id === this.bot.cm.id &&
-      message.author.id === this.bot.owoBotId &&
-      message.content.includes(nick)
-    ) {
-      if (message.content.includes("Here is your daily **<:cowoncy:")) {
-        const match = message.content.match(
-          /Here is your daily \*\*<:cowoncy:\d+> ([\d,]+)/
-        );
+      state.huntCount++;
+      console.log(`[${channel.name}] daily.js: hunt count = ${state.huntCount}/3`);
 
-        await this.bot.removeQueue(cmd);
-        await this.bot.setStat(true);
-
-        if (match) {
-          const amount = parseInt(match[1].replace(/,/g, ""), 10);
-          this.bot.updateCash(amount);
-        }
-
-        await this.bot.sleepTill(this.bot.calcTime());
-        await this.bot.sleepTill(this.cooldowns.moderateCooldown);
-        await this.bot.putQueue(cmd, { priority: true });
-        await this.bot.setStat(false);
-
-        const accounts = loadJson();
-        accounts[String(this.bot.user.id)].daily = timeInSeconds();
-        saveJson(accounts);
-
-        if (this.bot.globalSettingsDict?.webhook?.enabled) {
-          await this.bot.sendWebhook("daily_claim");
-        }
+      if (state.huntCount >= 3) {
+        state.huntCount = 0;
+        state.pending    = true;
+        sendDaily(channel);
       }
-
-      if (
-        message.content.includes("**⏱ |** Nu! **") &&
-        message.content.includes("! You need to wait")
-      ) {
-        await this.bot.removeQueue(cmd);
-        await this.bot.setStat(true);
-        await this.bot.sleepTill(this.bot.calcTime());
-        await this.bot.sleepTill(this.cooldowns.moderateCooldown);
-        await this.bot.putQueue(cmd, { priority: true });
-        await this.bot.setStat(false);
-      }
-    }
-  }
-}
-
-module.exports = Daily;
+    },
+  };
+};
+    
