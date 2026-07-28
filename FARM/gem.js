@@ -22,7 +22,7 @@ function loadGemConfig() {
     const parsed = JSON.parse(raw);
     return parsed.gem || {};
   } catch (err) {
-    console.log(`[gem.js]  config.json: ${err.message}`);
+    console.log(`[gem.js] không đọc được config.json: ${err.message}`);
     return {};
   }
 }
@@ -59,15 +59,14 @@ module.exports = function startGemItemWatcher(client, channelId) {
       const { configKey, command } = ITEM_ACTIONS[code];
 
       if (!gemConfig[configKey]) {
-        console.log(`[${channel.name}] có item ${code} nhưng config.gem.${configKey} = false, bỏ qua`);
+        console.log(`[${channel.name}]  item ${code} of config.gem.${configKey} = false, skip.`);
         continue;
       }
 
-      await delay(1000);
+      await delay(2500);
       await channel.send(command);
-      console.log(`[${channel.name}] item ${code} → gửi: ${command}`);
-      await delay(2000);
+      console.log(`[${channel.name}] item ${code} → : ${command}`);
     }
   });
 };
-    
+  
