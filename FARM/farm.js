@@ -7,6 +7,7 @@ const startGemWatcher = require('./inv');
 const startDailyTimer = require('../untils/daily');
 const startBlackjack = require('../gamble/blackjack');
 const startHuntbot = require('../huntbot/huntbot');
+const startGemItemWatcher = require('./gem');
 
 const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const randomDelay = (min, max) => Math.floor(Math.random() * (max - min) + min);
@@ -95,14 +96,7 @@ module.exports = async function farm(client, channelId, state) {
       stats.hunt++;
       console.log(`[${tag}] Hunt #${stats.hunt} — ${timestamp()}`);
 
-      if (stats.hunt % 3 === 0) {
-        notify(
-          `Farm ${tag} — ${stats.hunt} hunt`,
-          `Đã farm được ${stats.hunt} lần hunt!`,
-          '/'
-        ).catch(() => {});
-      }
-
+      dailyTimer.onHuntSuccess(channel);
       sendPhrase();
     } catch (err) {
       console.error(`[${tag}] hunt error:`, err);
@@ -140,13 +134,6 @@ module.exports = async function farm(client, channelId, state) {
       stats.battle++;
       console.log(`[${tag}] Battle #${stats.battle} — ${timestamp()}`);
 
-      if (stats.battle % 3 === 0) {
-        notify(
-          `Farm ${tag} — ${stats.battle} battle`,
-          `Đã farm được ${stats.battle} lần battle!`,
-          '/'
-        ).catch(() => {});
-      }
     } catch (err) {
       console.error(`[${tag}] battle error:`, err);
     } finally {
@@ -195,9 +182,10 @@ module.exports = async function farm(client, channelId, state) {
   startCaptchaDetector(client, channelId, client.user.id, global);
   startAutoPause();
   startGemWatcher(client, channelId, global);
+  startGemItemWatcher(client, channelId);
   startStatsCommand(client, stats);
   startRPC(client);
-  new startDailyTimer(client, channelId);
+  const dailyTimer = startDailyTimer(client, channelId);
   startBlackjack(client, channel, global);
   startHuntbot(client, channelId, global);
 
