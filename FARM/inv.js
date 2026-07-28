@@ -171,4 +171,4 @@ module.exports = function startGemWatcher(client, channelId, global) {
     }
   });
 };
-      
+  
