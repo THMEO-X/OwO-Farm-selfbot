@@ -33,6 +33,7 @@
 > 5. cd OwO-Farm-selfbot-main
 6. 
 ```
+termux-setup-storage
 pkg update
  pkg install nodejs-lts
  pkg install libvips
